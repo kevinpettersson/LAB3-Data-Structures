@@ -1,6 +1,3 @@
-{-# OPTIONS -Wall #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-
 --------------------------------------------------------------------------------
 
 module AATree (
@@ -14,7 +11,6 @@ module AATree (
   height,        -- AATree a -> Int
   checkTree      -- Ord a => AATree a -> Bool
  ) where
-import Debug.Trace (traceEvent)
 --import Control.Applicative (Alternative(empty))
 --mport Data.Sequence (Seq(Empty), empty)
 
@@ -52,10 +48,16 @@ split t = t
 skew :: AATree a -> AATree a
 skew t = t
 
+singleton :: a -> AATree a
+singleton x = Node 1 x Empty Empty
+
 -- and call these from insert.
 insert :: Ord a => a -> AATree a -> AATree a
-insert x Empty = Node 1 x Empty Empty
-insert x (Node level y l r) = error "edad"
+insert x Empty              = singleton x
+insert x (Node level y l r) = case compare x y of 
+  LT -> Node level y l (insert x r)
+  EQ -> Node level x l r
+  GT -> Node level y (insert x l) r
 
 
 --Först rekursivt samla alla värden från vänstra underträdet l, vilket säkerställer att alla värden som är mindre än nodens värde v behandlas först.
@@ -98,7 +100,6 @@ checkTree root =
 
 -- True if the given list is ordered
 isSorted :: Ord a => [a] -> Bool
--- isSorted = error "isSorted not implemented"
 isSorted [] = True
 isSorted [x] = True
 isSorted (x:y:xs) = x <= y && isSorted (y:xs)
