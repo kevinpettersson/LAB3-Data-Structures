@@ -33,37 +33,35 @@ emptyTree = Empty
 -- otherwise: Om det sökta värdet x inte är mindre än eller större än v (d.v.s. x == v), 
 -- har vi hittat noden som innehåller det sökta värdet, och funktionen returnerar Just v.
 get :: Ord a => a -> AATree a -> Maybe a
--- get = error "get not implemented"
 get _ Empty = Nothing
 get x (Node _ v l r)
   | x < v = get x l
   | x > v = get x r
   | otherwise = Just v
 
--- You may find it helpful to define
-split :: AATree a -> AATree a
-split t = t
-
-
-skew :: AATree a -> AATree a
-skew t = t
-
 singleton :: a -> AATree a
 singleton x = Node 1 x Empty Empty
 
 -- and call these from insert.
 insert :: Ord a => a -> AATree a -> AATree a
-insert x Empty              = singleton x
-insert x (Node level y l r) = case compare x y of 
-  LT -> Node level y l (insert x r)
-  EQ -> Node level x l r
-  GT -> Node level y (insert x l) r
+insert x Empty            = singleton x
+insert x (Node lvl v l r)
+  | x < v                 = skew (Node lvl v (insert x l) r)
+  | otherwise             = skew (Node lvl v l (insert x r))
 
+skew :: AATree a -> AATree a
+skew (Node lvl v l (Node rLvl rv rl rr))
+  | lvl == rLvl = Node rLvl rv (Node lvl v l rl) rr
+  | otherwise = Node lvl v l (Node rLvl rv rl rr)
 
---Först rekursivt samla alla värden från vänstra underträdet l, vilket säkerställer att alla värden som är mindre än nodens värde v behandlas först.
---Sedan lägg till nodens värde v till listan. Eftersom detta är en nod vi besöker efter dess vänstra underträd men innan dess högra underträd, 
+-- You may find it helpful to define
+split :: AATree a -> AATree a
+split t = t
+
+--Först rekursivt samla alla värden från vänstra sub-trädet l, vilket säkerställer att alla värden som är mindre än nodens värde v behandlas först.
+--Sedan lägg till nodens värde v till listan. Eftersom detta är en nod vi besöker efter dess vänstra underträd men innan dess högra sub-träd, 
 --placeras det exakt mitt emellan de värden som är mindre och större än det.
---Slutligen rekursivt samla alla värden från högra underträdet r, vilket innefattar alla värden som är större än nodens värde v.
+--Slutligen rekursivt samla alla värden från högra sub-trädet r, vilket innefattar alla värden som är större än nodens värde v.
 inorder :: AATree a -> [a]
 inorder Empty = []
 inorder (Node _ v l r) = inorder l ++ [v] ++ inorder r
@@ -77,8 +75,8 @@ size (Node _ _ l r) = 1 + size l + size r
 -- By recursively calling the height function.
 height :: AATree a -> Int
 height tree = case tree of
-      Empty -> 0
-      (Node _ _ l r) -> 1 + max (height l) (height r)
+  Empty -> 0
+  (Node _ _ l r) -> 1 + max (height l) (height r)
 
 --------------------------------------------------------------------------------
 -- Optional function
@@ -90,17 +88,19 @@ remove = error "remove not implemented"
 -- Check that an AA tree is ordered and obeys the AA invariants
 
 checkTree :: Ord a => AATree a -> Bool
-checkTree root =
-  isSorted (inorder root) &&
-  all checkLevels (nodes root)
+checkTree tree =
+  isSorted (inorder tree) &&
+  all checkLevels (nodes tree)
   where
     nodes x
       | isEmpty x = []
       | otherwise = x : nodes (leftSub x) ++ nodes (rightSub x)
 
 -- True if the given list is ordered
+-- Recursivly checks that left node is less or equal to the right node. And that the level of the left node 
+-- is greater or equal to the right node.
 isSorted :: Ord a => [a] -> Bool
-isSorted [] = True
+isSorted []  = True
 isSorted [x] = True
 isSorted (x:y:xs) = x <= y && isSorted (y:xs)
 
@@ -113,10 +113,19 @@ isSorted (x:y:xs) = x <= y && isSorted (y:xs)
 --     rightGrandchildOK node
 -- where each conjunct checks one aspect of the invariant
 checkLevels :: AATree a -> Bool
-checkLevels = error "checkLevels not implemented"
+checkLevels Empty                  = True
+checkLevels (Node _ _ Empty Empty) = True
+checkLevels (Node lvl v l r)       = checkLeft && checkRight && checkLevels l && checkLevels r
+  where
+    checkLeft = case l of 
+      Empty -> True
+      (Node leftLVL _ _ _) -> leftLVL < lvl
+    checkRight = case r of 
+      Empty -> True
+      (Node rightLVL _ _ _) -> rightLVL <= lvl
 
 isEmpty :: AATree a -> Bool
-isEmpty Empty = True
+isEmpty (Node _ _ Empty Empty) = True
 
 leftSub :: AATree a -> AATree a
 leftSub Empty = Empty
