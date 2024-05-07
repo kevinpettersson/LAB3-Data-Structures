@@ -11,27 +11,25 @@ module AATree (
   height,        -- AATree a -> Int
   checkTree      -- Ord a => AATree a -> Bool
  ) where
+import Debug.Trace (traceEvent)
+import Data.Maybe
 --import Control.Applicative (Alternative(empty))
 --mport Data.Sequence (Seq(Empty), empty)
 
 --------------------------------------------------------------------------------
 
 -- AA search trees
-data AATree a = Empty | Node {
-                  level :: Int,
-                  value :: a,
-                  left  :: AATree a,
-                  right :: AATree a
-                } deriving (Eq, Show, Read)
+data AATree a = Empty | Node {  level :: Int,
+                                value :: a,
+                                left  :: AATree a,
+                                right :: AATree a
+                              } deriving (Eq, Show, Read)
 
 emptyTree :: AATree a
 emptyTree = Empty
 
--- Just a om värdet finns i trädet, eller Nothing om värdet inte finns
--- x < v: Om det sökta värdet x är mindre än nodens värde v, fortsätter sökningen rekursivt i nodens vänstra underträd l
--- x > v: Om det sökta värdet x är större än nodens värde v, fortsätter sökningen rekursivt i nodens högra underträd r.
--- otherwise: Om det sökta värdet x inte är mindre än eller större än v (d.v.s. x == v), 
--- har vi hittat noden som innehåller det sökta värdet, och funktionen returnerar Just v.
+-- Takes a value and checks if the value exists in the tree, if it less than parent value we check in the left sub-tree
+-- otherwise we check in the right sub-tree and if value dosent exist func returns nothing.
 get :: Ord a => a -> AATree a -> Maybe a
 get _ Empty = Nothing
 get x (Node _ v l r)
@@ -39,34 +37,60 @@ get x (Node _ v l r)
   | x > v = get x r
   | otherwise = Just v
 
+-- Takes a value and creates a node with two empty children.
 singleton :: a -> AATree a
 singleton x = Node 1 x Empty Empty
 
--- and call these from insert.
+-- If the tree is empty, create a call singleton function.
+-- If value already exist do nothing, return same tree.
+-- If value is less than parent value, 
 insert :: Ord a => a -> AATree a -> AATree a
-insert x Empty            = singleton x
+insert x Empty             = singleton x
+insert x tree
+  | isJust (get x tree)    = tree                           
 insert x (Node lvl v l r)
-  | x < v                 = skew (Node lvl v (insert x l) r)
-  | otherwise             = skew (Node lvl v l (insert x r))
+  | x < v                  = split (skew (Node lvl v (insert x l) r))
+  | otherwise              = split (skew (Node lvl v l (insert x r)))
 
 skew :: AATree a -> AATree a
-skew (Node lvl v l (Node rLvl rv rl rr))
-  | lvl == rLvl = Node rLvl rv (Node lvl v l rl) rr
-  | otherwise = Node lvl v l (Node rLvl rv rl rr)
+skew Empty                = Empty
+skew (Node lvl v Empty r) = Node lvl v Empty r
+skew (Node lvl v (Node llvl lv ll lr) r)
+  | llvl == lvl = skew (Node llvl lv ll (Node lvl v lr r)) 
+  | otherwise   =  Node lvl v (Node llvl lv ll lr) r
 
 -- You may find it helpful to define
 split :: AATree a -> AATree a
-split t = t
+split Empty                                  = Empty
+split (Node _ _ _ Empty)                     = Empty
+split (Node lvl v l 
+      (Node rlvl rv rl Empty))               = Node lvl v l (Node rlvl rv rl Empty)
+split (Node lvl v l 
+      (Node rlvl rv rl 
+      (Node rrlvl rrv rrl rrr)))
+  | lvl == rlvl && rlvl == rrlvl              = split (Node rlvl rv (Node (lvl+1) v l rl) (Node (rrlvl+1) rrv rrl rrr))
+  | otherwise                                 = Node lvl v l (Node rlvl rv rl (Node rrlvl rrv rrl rrr))
 
---Först rekursivt samla alla värden från vänstra sub-trädet l, vilket säkerställer att alla värden som är mindre än nodens värde v behandlas först.
---Sedan lägg till nodens värde v till listan. Eftersom detta är en nod vi besöker efter dess vänstra underträd men innan dess högra sub-träd, 
---placeras det exakt mitt emellan de värden som är mindre och större än det.
---Slutligen rekursivt samla alla värden från högra sub-trädet r, vilket innefattar alla värden som är större än nodens värde v.
+
+-- T = Node lvl v r l
+-- R = Node rlvl rv rl rr
+-- X = Node rrlvl rrv rrl rrr
+
+-- After split: 
+
+-- R = Node rlvl rv (Node lvl v l rl) (Node rrlvl rrv rrl rrr)    R           T  R  X
+--                                                              T   X       A   B 
+--                                                            A   B                                                                        
+--skew (Node lvl v l (Node rLvl rv rl rr))
+  -- | lvl == rLvl = Node rLvl rv (Node lvl v l rl) rr
+  -- | otherwise = Node lvl v l (Node rLvl rv rl rr)
+
+-- Recursivly calls the function on the left and right sub-tree and appending the value in between, creating a list.
 inorder :: AATree a -> [a]
 inorder Empty = []
 inorder (Node _ v l r) = inorder l ++ [v] ++ inorder r
 
--- Räknar antalet noder
+-- Calculates the total amount of nodes in the tree.
 size :: AATree a -> Int
 size Empty = 0
 size (Node _ _ l r) = 1 + size l + size r
@@ -89,8 +113,7 @@ remove = error "remove not implemented"
 
 checkTree :: Ord a => AATree a -> Bool
 checkTree tree =
-  isSorted (inorder tree) &&
-  all checkLevels (nodes tree)
+  isSorted (inorder tree) && all checkLevels (nodes tree)
   where
     nodes x
       | isEmpty x = []
@@ -117,23 +140,24 @@ checkLevels Empty                  = True
 checkLevels (Node _ _ Empty Empty) = True
 checkLevels (Node lvl v l r)       = checkLeft && checkRight && checkLevels l && checkLevels r
   where
-    checkLeft = case l of 
-      Empty -> True
+    checkLeft = case l of
+      Empty                -> True
       (Node leftLVL _ _ _) -> leftLVL < lvl
-    checkRight = case r of 
-      Empty -> True
+    checkRight = case r of
+      Empty                 -> True
       (Node rightLVL _ _ _) -> rightLVL <= lvl
 
 isEmpty :: AATree a -> Bool
-isEmpty (Node _ _ Empty Empty) = True
+isEmpty Empty = True
+isEmpty _     = False
 
 leftSub :: AATree a -> AATree a
-leftSub Empty = Empty
-leftSub (Node _ _ l _) = l 
+leftSub Empty          = Empty
+leftSub (Node _ _ l _) = l
 
 rightSub :: AATree a -> AATree a
-rightSub Empty = Empty
-rightSub (Node _ _ _ r) = r 
+rightSub Empty          = Empty
+rightSub (Node _ _ _ r) = r
 
 --------------------------------------------------------------------------------
 
