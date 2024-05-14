@@ -33,11 +33,11 @@ emptyTree = Empty
 -- otherwise we check in the right sub-tree and if value dosent exist func returns nothing.
 -- Complexity: O(log n)
 get :: Ord a => a -> AATree a -> Maybe a
-get _ Empty = Nothing
+get _ Empty   = Nothing
 get x (Node _ v l r)
-  | x < v = get x l
-  | x > v = get x r
-  | otherwise = Just v
+  | x < v     = get x l
+  | x > v     = get x r
+  | otherwise = Just x
 
 -- Takes a value and creates a node with two empty children.
 -- Complexity: O(1)
@@ -50,49 +50,44 @@ singleton x = Node 1 x Empty Empty
 -- By doing so we recurisvly call insert and check the parent value with the new value, minimizing to a new sub-tree.
 -- Complexity: O(log n)
 insert :: Ord a => a -> AATree a -> AATree a
-insert x Empty                      = singleton x
+insert x Empty            = singleton x
 insert x (Node lvl v l r)
-  | x < v                           = split (skew (Node lvl v (insert x l) r))
-  | x > v                           = split (skew (Node lvl v l (insert x r)))
-  | otherwise                       = Node lvl v l r
+  | x < v                 = split (skew (Node lvl v (insert x l) r))
+  | x > v                 = split (skew (Node lvl v l (insert x r)))
+  | otherwise             = Node lvl v l r
 
 -- If parent level is the same as left child level, does a skew.
 -- Complexity: O(1)
 skew :: AATree a -> AATree a
-skew Empty                                = Empty
-skew (Node lvl v Empty r)                 = Node lvl v Empty r
 skew (Node lvl v (Node llvl lv ll lr) r)
-  | llvl == lvl                           = Node llvl lv ll (Node lvl v lr r)
-  | otherwise                             =  Node lvl v (Node llvl lv ll lr) r
+  | llvl == lvl = Node llvl lv ll (Node lvl v lr r)
+skew tree       = tree
 
 -- If parent level and right child and right grandchild are on the same level split the 3-node.
 -- Complexity: O(1)
 split :: AATree a -> AATree a
-split Empty                                  = Empty
-split (Node _ _ _ Empty)                     = Empty
-split (Node lvl v l(Node rlvl rv rl rr))
-  | lvl == rlvl && rlvl == height rl         = Node rlvl rv (Node lvl v l rl) rr
-  | otherwise                                = Node lvl v l (Node rlvl rv rl rr)
+split (Node lvl v l(Node rlvl rv rl (Node rrlvl rrv rrl rrr)))
+  | lvl == rlvl && rlvl == rrlvl = Node (rlvl+1) rv (Node lvl v l rl) (Node rrlvl rrv rrl rrr)
+split tree                       = tree
 
 -- Recursivly calls the function on the left and right sub-tree and appending the value in between, creating a list.
 -- Complexity: O(n)
 inorder :: AATree a -> [a]
-inorder Empty = []
+inorder Empty          = []
 inorder (Node _ v l r) = inorder l ++ [v] ++ inorder r
 
 -- Calculates the total amount of nodes in the tree.
 -- Complexity: O(n)
 size :: AATree a -> Int
-size Empty = 0
+size Empty          = 0
 size (Node _ _ l r) = 1 + size l + size r
 
 -- Returns 0 if the tree is empty and otherwise adds 1 and choosing the maximum height of the left and right sub-tree.
 -- By recursively calling the height function.
 -- Complexity: O(n)
 height :: AATree a -> Int
-height tree = case tree of
-  Empty -> 0
-  (Node _ _ l r) -> 1 + max (height l) (height r)
+height Empty          = 0
+height (Node _ _ l r) = 1 + max (height l) (height r)
 
 --------------------------------------------------------------------------------
 -- Optional function
@@ -117,8 +112,8 @@ checkTree tree =
 -- is greater or equal to the right node.
 -- Complexity: O(n)
 isSorted :: Ord a => [a] -> Bool
-isSorted []  = True
-isSorted [x] = True
+isSorted []       = True
+isSorted [x]      = True
 isSorted (x:y:xs) = x <= y && isSorted (y:xs)
 
 
